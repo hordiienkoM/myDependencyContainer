@@ -47,9 +47,14 @@
    (К) Метод DependencyContainer.createConstructorParameters
 4. Возможность добавлять обработчики перед и после добавления в контейнер
 
-   (К) В папке prePostProcessor есть соответствующие интерфейсы. Уналедованные от них классы, можно передавать
-в методы DependencyContainer.addPostProcessor, DependencyContainer.addPostProcessor. Это нужно перед тем, как был 
-запущен метод DependencyContainer.run
+   (К) Чтобы сделать обработчик событий, нужно создать класс, унаследовать его от Subscriber, переопределить метод
+handleEvent(Event event), и зарегестрировать в контейнере, вызвав метод DependencyContainer.addSubscriber(Subscriber subscriber). 
+В нашем случае у Event есть 2 реализации - PostProcessComponentEvent и PreProcessComponentEvent, которые хранят 
+класс Обьекта вызвавшего создание Event. Если нужно сделать обработчик для какой-то определенной реализации, в методе 
+handleEvent(Event event) нужно будет добавить проверку:
+   event instanceof PostProcessComponentEvent/PreProcessComponentEvent
+   Обработчики нужно добавлять до запуска метода DependencyContainer.run . Пример их реализации есть в репозитории
+testDependencyContainer.
 5. Развернутая и понятная информация о том, в каком моменте внедрение зависимостей уходит в круговой цикл
 
    (K) За это отвечает класс DependencyChecker. Если есть кольцевая зависимость, Class1 (Class2), Class2 (Class1) 
