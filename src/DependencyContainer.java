@@ -2,8 +2,10 @@ import annotation.Autowired;
 import annotation.Component;
 import annotation.PostConstructor;
 import annotation.Qualifier;
-import prePostProcessor.ComponentPostProcessor;
-import prePostProcessor.ComponentPreProcessor;
+import customEventBus.EventBus;
+import customEventBus.PostProcessComponentEvent;
+import customEventBus.PreProcessComponentEvent;
+import customEventBus.Subscriber;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,10 +19,16 @@ import java.util.*;
 public class DependencyContainer {
     private final Map<Class<?>, Object> dependencies;
     private final Map<String, Object> specifiedDependencies;
-    private final List<ComponentPreProcessor> preProcessors;
-    private final List<ComponentPostProcessor> postProcessors;
+    private final EventBus eventBus;
 
     private Set<Class<?>> allComponents;
+
+    public DependencyContainer() {
+        dependencies = new HashMap<>();
+        specifiedDependencies = new HashMap<>();
+        eventBus = new EventBus();
+    }
+
     public void run(Class<?> callingClass) {
         try {
             String rootPackage = getRootPackage(callingClass);
@@ -33,16 +41,9 @@ public class DependencyContainer {
         }
     }
 
-    public DependencyContainer() {
-        dependencies = new HashMap<>();
-        specifiedDependencies = new HashMap<>();
-        preProcessors = new LinkedList<>();
-        postProcessors = new LinkedList<>();
-    }
-
     public void register(Object instance) {
         Class<?> clazz = instance.getClass();
-        startPreProcessors(clazz);
+        eventBus.post(new PreProcessComponentEvent(clazz));
         Annotation[] annotations = clazz.getAnnotations();
         for (Annotation annotation : annotations) {
             if (annotation instanceof Component) {
@@ -54,7 +55,7 @@ public class DependencyContainer {
             }
         }
         dependencies.put(clazz, instance);
-        startPostProcessors(clazz);
+        eventBus.post(new PostProcessComponentEvent(clazz));
     }
 
     public <T> T resolve(Class<T> clazz) {
@@ -72,27 +73,6 @@ public class DependencyContainer {
     public boolean isRegistered(String qualifierValue) {
         return specifiedDependencies.containsKey(qualifierValue);
     }
-
-    public void addPreProcessor(ComponentPreProcessor processor) {
-        preProcessors.add(processor);
-    }
-
-    public void addPostProcessor(ComponentPostProcessor processor) {
-        postProcessors.add(processor);
-    }
-
-    private <T> void startPreProcessors(Class<T> clazz) {
-        for (ComponentPreProcessor processor : preProcessors) {
-            processor.preProcess(clazz);
-        }
-    }
-
-    private <T> void startPostProcessors(Class<T> clazz) {
-        for (ComponentPostProcessor processor : postProcessors) {
-            processor.postProcess(clazz);
-        }
-    }
-
     private String getRootPackage(Class<?> callingClass) {
         String className = callingClass.getName();
         int lastDotIndex = className.lastIndexOf('.');
@@ -188,6 +168,15 @@ public class DependencyContainer {
             }
         }
     }
+    public void addSubscriber(Subscriber subscriber) {
+        eventBus.register(PreProcessComponentEvent.class, subscriber);
+        eventBus.register(PostProcessComponentEvent.class, subscriber);
+    }
+
+    public void removeSubscriber(Subscriber subscriber) {
+        eventBus.unregister(PreProcessComponentEvent.class, subscriber);
+        eventBus.unregister(PostProcessComponentEvent.class, subscriber);
+    }
 
     private Object[] createConstructorParameters(Constructor<?> constructor, Set<Class<?>> toCreateSet) {
         Class<?>[] parameterTypes = constructor.getParameterTypes();
@@ -271,7 +260,6 @@ public class DependencyContainer {
         }
         throw new IllegalArgumentException("Class with qualifier value '" + qualifierValue + "' not found.");
     }
-
 
     private Constructor<?> findConstructor(Class<?> clazz) {
         Constructor<?>[] constructors = clazz.getDeclaredConstructors();
