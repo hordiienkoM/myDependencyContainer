@@ -23,16 +23,23 @@ public class DependencyContainer {
 
     private Set<Class<?>> allComponents;
 
+    private String rootPackage;
+    private ClassLoader classLoader;
+
     public DependencyContainer() {
         dependencies = new HashMap<>();
         specifiedDependencies = new HashMap<>();
         eventBus = new EventBus();
     }
 
-    public void run(Class<?> callingClass) {
+    public void init(String rootPackage, ClassLoader classLoader) {
+        this.rootPackage = rootPackage;
+        this.classLoader = classLoader;
+        run();
+    }
+    public void run() {
         try {
-            String rootPackage = getRootPackage(callingClass);
-            List<Class<?>> componentClasses = scanForComponents(rootPackage);
+            List<Class<?>> componentClasses = scanForComponents(this.rootPackage, this.classLoader);
             this.allComponents = new HashSet<>(componentClasses);
             new DependencyChecker().checkDependencies(componentClasses);
             componentsCreating(componentClasses);
@@ -73,15 +80,9 @@ public class DependencyContainer {
     public boolean isRegistered(String qualifierValue) {
         return specifiedDependencies.containsKey(qualifierValue);
     }
-    private String getRootPackage(Class<?> callingClass) {
-        String className = callingClass.getName();
-        int lastDotIndex = className.lastIndexOf('.');
-        return lastDotIndex != -1 ? className.substring(0, lastDotIndex) : "";
-    }
 
-    private List<Class<?>> scanForComponents(String rootPackage) throws IOException, ClassNotFoundException {
+    private List<Class<?>> scanForComponents(String rootPackage, ClassLoader classLoader) throws IOException, ClassNotFoundException {
         List<Class<?>> componentClasses = new ArrayList<>();
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = rootPackage.replace('.', '/');
         Enumeration<URL> resources = classLoader.getResources(path);
         while (resources.hasMoreElements()) {
