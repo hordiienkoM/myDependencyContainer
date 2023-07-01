@@ -3,9 +3,11 @@
 указать путь к jar файлу библиотеки, подтвердить выбор.
 
 В тестовом примере, есть готовые классы, на которых можно протестировать работу аннотаций.
-Для работы библиотеки, нужно в стартовом методе проекта создать экземпляр класса DependencyContainer и запустить 
-метод run(Main.class).
-Экземпляр контейнера через рефлексию считывает классы находящиеся в папке где был запущен, 
+Работа с контейнером происходит через методы статического класса IoC.
+Для корректной работы аннотаций, необходимо инициализировать контейнер, используя методы 
+IoC.init(String rootPackage, ClassLoader classLoader) или
+init(String rootPackage, ClassLoader classLoader, List<Subscriber> processors).
+При их использовании, контейнер через рефлексию считывает классы находящиеся в корневой папке, 
 анализирует аннотации и выполняет их обработку.
 
 Задание с комментариями:
@@ -17,9 +19,9 @@
 Все зависимости внедряются по мере необходимости, но это возможно только если зависимость так помечена аннотацией 
 @Component.
    Если нужно зарегестрировать бин у которого в конструкторе есть параметры без этой аннотации, это можно сделать
-вручную с помощью метода DependencyContainer.register(Object instance). 
+вручную с помощью метода IoC.registerBean(Object instance). 
    Исключение - интерфейсы, у которых есть наследник с аннотацией @Component. Их тоже загрузит автоматически.
-   Получить бин можно с помощью метода DependencyContainer.resolve(Class<T> clazz)
+   Получить бин можно с помощью метода IoC.getBean(Class<T> clazz)
 2. Autowired - применяется к конструктору. Если в классе несколько конструкторов,
    необходимо оставить возможность отметить, какой конструктор стоит использовать, этой аннотацией.
    В противном случае используется первый доступный конструктор.
@@ -39,8 +41,8 @@
    (К) класс DependencyContainer
 2. Доступ к инстансам должен предоставляться методом контейнера, по классу.
 
-   (K) Метод DependencyContainer.DependencyContainer.resolve(Class<T> clazz). 
-Исключение, если эмулятор пытается получить инстанс параметра отмеченного аннотацией @Qualifier. За этот случай
+   (K) Метод DependencyContainer.DependencyContainer.resolve(Class<T> clazz).  
+Исключение, если сам контейнер пытается получить инстанс параметра отмеченного аннотацией @Qualifier. За этот случай
 отвечает метод DependencyContainer.resolve(Class<T> clazz, String qualifierValue)
 3. Зависимости компонента должны быть автоматически включены в него.
 
@@ -48,20 +50,23 @@
 4. Возможность добавлять обработчики перед и после добавления в контейнер
 
    (К) Чтобы сделать обработчик событий, нужно создать класс, унаследовать его от Subscriber, переопределить метод
-handleEvent(Event event), и зарегестрировать в контейнере, вызвав метод DependencyContainer.addSubscriber(Subscriber subscriber). 
+handleEvent(Event event), и зарегестрировать в контейнере, вызвав метод IoC.addProcessors(List<Subscriber> processors), 
+или инициализировав методом init(String rootPackage, ClassLoader classLoader, List<Subscriber> processors).
 В нашем случае у Event есть 2 реализации - PostProcessComponentEvent и PreProcessComponentEvent, которые хранят 
 класс Обьекта вызвавшего создание Event. Если нужно сделать обработчик для какой-то определенной реализации, в методе 
 handleEvent(Event event) нужно будет добавить проверку:
    event instanceof PostProcessComponentEvent/PreProcessComponentEvent
-   Обработчики нужно добавлять до запуска метода DependencyContainer.run . Пример их реализации есть в репозитории
-testDependencyContainer.
+   Обработчики нужно добавлять до запуска методов IoC.registerBean\init(String rootPackage, ClassLoader classLoader). 
+Пример их реализации есть в репозитории testDependencyContainer.
 5. Развернутая и понятная информация о том, в каком моменте внедрение зависимостей уходит в круговой цикл
 
    (K) За это отвечает класс DependencyChecker. Если есть кольцевая зависимость, Class1 (Class2), Class2 (Class1) 
 он выдаст ошибку вида:
    Class1 -> Class2 -> Class1
 6. Развернутая работа с ClassLoader, чтобы разные загрузчики не ломали реализацию.
-   Этот пункт не выполнен, слишком поздно обратил на него внимание.
+
+   (K) Можно использовать разные загрузчики, для этого используются методы IoC.init(String rootPackage, ClassLoader classLoader),
+IoC.init(String rootPackage, ClassLoader classLoader, List<Subscriber> processors)
 
 Примечание:
 Вы можете использовать любые библиотеки, однако после сборки ваш итоговый jar-файл не должен превышать 300кб.
